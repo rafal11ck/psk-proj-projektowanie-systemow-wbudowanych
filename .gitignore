@@ -1,0 +1,24 @@
+# Quartus II build artifacts
+db/
+incremental_db/
+output_files/
+simulation/
+greybox_tmp/
+*.qws
+*.rpt
+*.summary
+*.smsg
+*.pin
+*.pof
+*.sof
+*.jdi
+*.sld
+*.qarlog
+*.qar
+
+# Editor / OS
+.DS_Store
+*.swp
+*~
+.vscode/
+.idea/
