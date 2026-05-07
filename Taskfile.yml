@@ -1,0 +1,38 @@
+version: '3'
+
+vars:
+  WORKDIR: build
+  GHDLFLAGS: --std=08 --workdir=build
+  SRC: src/fp_pkg.vhd src/fp_normalize.vhd src/fp_add_sub.vhd src/fp_mul.vhd src/top.vhd
+  TB: test/tb_top.vhd
+
+tasks:
+  default:
+    desc: Uruchom wszystkie testy
+    deps: [test]
+
+  analyze:
+    desc: Skompiluj zrodla i testbench
+    cmds:
+      - mkdir -p {{.WORKDIR}}
+      - ghdl -a {{.GHDLFLAGS}} {{.SRC}} {{.TB}}
+
+  test:
+    desc: Uruchom tb_top (14 testow)
+    deps: [analyze]
+    cmds:
+      - ghdl -e {{.GHDLFLAGS}} tb_top
+      - ghdl -r {{.GHDLFLAGS}} tb_top --stop-time=10us
+
+  wave:
+    desc: Uruchom tb_top i otworz GTKWave (format GHW - obsluguje rekordy fp_t)
+    deps: [analyze]
+    cmds:
+      - ghdl -e {{.GHDLFLAGS}} tb_top
+      - ghdl -r {{.GHDLFLAGS}} tb_top --stop-time=10us --wave={{.WORKDIR}}/wave.ghw
+      - gtkwave {{.WORKDIR}}/wave.ghw
+
+  clean:
+    desc: Usun wszystkie artefakty
+    cmds:
+      - rm -rf {{.WORKDIR}} *.cf work-obj*.cf tb_top *.vcd *.ghw

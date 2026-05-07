@@ -22,3 +22,5 @@ greybox_tmp/
 *~
 .vscode/
 .idea/
+build
+.direnv
