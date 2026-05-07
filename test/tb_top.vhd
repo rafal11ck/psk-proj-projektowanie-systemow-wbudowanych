@@ -20,6 +20,7 @@ architecture sim of tb_top is
     signal sw   : std_logic_vector(15 downto 0) := (others => '0');
     signal key  : std_logic_vector(3  downto 0) := "1111";
     signal ledr : std_logic_vector(15 downto 0);
+    signal ledg : std_logic_vector(8  downto 0);
 
     -- Okres zegara jako stala czasowa. "time" to typ VHDL tylko dla symulacji.
     constant CLK_PERIOD : time := 20 ns;  -- 50 MHz
@@ -32,7 +33,8 @@ begin
             CLOCK_50 => clk,
             SW       => sw,
             KEY      => key,
-            LEDR     => ledr
+            LEDR     => ledr,
+            LEDG     => ledg
         );
 
     -- Generator zegara: process bez listy czulosci z "wait" wykonuje sie w nieskonczonej petli.
@@ -66,9 +68,13 @@ begin
         -- assert: jesli warunek falszywy -> ModelSim wypisze blad do konsoli.
         -- x"6000" to hex literal dla std_logic_vector.
         assert ledr = x"6000"
-            report "TEST 1 FAIL: ADD 1.0+0.5, oczekiwano 0x6000" severity ERROR;
+            report "TEST 1 FAIL: ADD 1.0+0.5, oczekiwano mantysa=0x6000" severity ERROR;
         assert ledr = x"6000"
             report "TEST 1 PASS: ADD 1.0+0.5 -> mantysa=0x6000" severity NOTE;
+        assert ledg = "000000001"
+            report "TEST 1 FAIL: ADD 1.0+0.5, oczekiwano wykladnik=1" severity ERROR;
+        assert ledg = "000000001"
+            report "TEST 1 PASS: ADD 1.0+0.5 -> wykladnik=1" severity NOTE;
 
         wait for 2 * CLK_PERIOD;
 
@@ -80,9 +86,13 @@ begin
         wait for 6 * CLK_PERIOD;
 
         assert ledr = x"4000"
-            report "TEST 2 FAIL: SUB 1.0-0.5, oczekiwano 0x4000" severity ERROR;
+            report "TEST 2 FAIL: SUB 1.0-0.5, oczekiwano mantysa=0x4000" severity ERROR;
         assert ledr = x"4000"
             report "TEST 2 PASS: SUB 1.0-0.5 -> mantysa=0x4000" severity NOTE;
+        assert ledg = "000000000"
+            report "TEST 2 FAIL: SUB 1.0-0.5, oczekiwano wykladnik=0" severity ERROR;
+        assert ledg = "000000000"
+            report "TEST 2 PASS: SUB 1.0-0.5 -> wykladnik=0" severity NOTE;
 
         wait for 2 * CLK_PERIOD;
 
@@ -94,9 +104,13 @@ begin
         wait for 6 * CLK_PERIOD;   -- MUL potrzebuje 3 cykli po start
 
         assert ledr = x"4000"
-            report "TEST 3 FAIL: MUL 1.0*0.5, oczekiwano 0x4000" severity ERROR;
+            report "TEST 3 FAIL: MUL 1.0*0.5, oczekiwano mantysa=0x4000" severity ERROR;
         assert ledr = x"4000"
             report "TEST 3 PASS: MUL 1.0*0.5 -> mantysa=0x4000" severity NOTE;
+        assert ledg = "000000000"
+            report "TEST 3 FAIL: MUL 1.0*0.5, oczekiwano wykladnik=0" severity ERROR;
+        assert ledg = "000000000"
+            report "TEST 3 PASS: MUL 1.0*0.5 -> wykladnik=0" severity NOTE;
 
         wait for 5 * CLK_PERIOD;
 

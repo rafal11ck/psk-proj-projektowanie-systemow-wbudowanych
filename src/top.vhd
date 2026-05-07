@@ -16,7 +16,8 @@ entity top is
         CLOCK_50 : in  std_logic;
         SW       : in  std_logic_vector(15 downto 0);  -- SW[1:0] = operacja
         KEY      : in  std_logic_vector(3  downto 0);  -- active-low: wcisniety='0'
-        LEDR     : out std_logic_vector(15 downto 0)   -- mantysa wyniku na diodach
+        LEDR     : out std_logic_vector(15 downto 0);  -- mantysa wyniku na diodach
+        LEDG     : out std_logic_vector(8  downto 0)   -- dolne bity wykladnika wyniku
     );
 end entity;
 
@@ -82,5 +83,9 @@ begin
     with SW(1 downto 0) select
         LEDR <= std_logic_vector(mul_result.mantissa)     when OP_MUL,
                 std_logic_vector(add_sub_result.mantissa) when others;
+
+    with SW(1 downto 0) select
+        LEDG <= std_logic_vector(mul_result.exponent(8 downto 0))     when OP_MUL,
+                std_logic_vector(add_sub_result.exponent(8 downto 0)) when others;
 
 end architecture;

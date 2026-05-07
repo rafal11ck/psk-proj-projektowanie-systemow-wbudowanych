@@ -406,10 +406,10 @@ SW[0]  ─────→ add_sub_op        │               │
                                 ▼               ▼
 A_IN ──────────────────→ [fp_add_sub] ──→ add_sub_result ──┐
 B_IN ──────────────────→                                    │
-                                                            ├──→ MUX ──→ LEDR
-A_IN ──────────────────→ [fp_mul]     ──→ mul_result    ──┘
-B_IN ──────────────────→                             ↑
-                                              SW[1:0]="10"
+                                                            ├──→ MUX ──→ LEDR (mantysa)
+A_IN ──────────────────→ [fp_mul]     ──→ mul_result    ──┤         └──→ LEDG (wykładnik [8:0])
+B_IN ──────────────────→                             ↑    │
+                                              SW[1:0]="10" └──────────────────────────────────┘
 ```
 
 Oba moduły obliczeniowe działają **równolegle** — oba startują jednocześnie gdy `start=1`. Multiplekser na końcu wybiera który wynik pokazać na LED.
@@ -638,6 +638,7 @@ Najważniejsze sygnały do obserwacji:
 - `key` — przyciski
 - `sw` — przełączniki
 - `ledr` — wynik (mantysa)
+- `ledg` — wynik (wykładnik, bity [8:0])
 - Sygnały wewnętrzne przez `dut/add_sub_inst/state` — stan FSM
 - `dut/add_sub_inst/done` — flaga gotowości
 - `dut/add_sub_inst/reg_result` — wynik add/sub (cały record)
@@ -705,6 +706,9 @@ SW[1]     → PIN_L21
 LEDR[0]   → PIN_R17
 LEDR[1]   → PIN_R16
 ... itd.
+LEDG[0]   → PIN_U22
+LEDG[1]   → PIN_U21
+... itd.
 ```
 (Dokładne numery pinów znajdziesz w dokumentacji swojej płytki — plik `.qsf` z przykładowych projektów DE1)
 
@@ -721,7 +725,7 @@ Przełączniki i przyciski:
 - `KEY[1]` (wciśnij jednokrotnie) = start obliczeń
 - `SW[1:0]` = wybór operacji: `00`=ADD, `01`=SUB, `10`=MUL
 
-Wynik (mantysa) wyświetlany binarnie na `LEDR[15:0]`.
+Wynik wyświetlany binarnie: mantysa na `LEDR[15:0]`, dolne 9 bitów wykładnika na `LEDG[8:0]`.
 
 Zmianę testowanych liczb A i B wykonujesz przez edycję stałych `A_IN` i `B_IN` w pliku `top.vhd` i ponowną kompilację.
 
