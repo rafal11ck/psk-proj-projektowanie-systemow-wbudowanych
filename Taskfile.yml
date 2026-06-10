@@ -3,7 +3,7 @@ version: '3'
 vars:
   WORKDIR: build
   GHDLFLAGS: --std=08 --workdir=build
-  SRC: src/fp_pkg.vhd src/fp_normalize.vhd src/fp_add_sub.vhd src/fp_mul.vhd src/top.vhd
+  SRC: src/fp_pkg.vhd src/fp_normalize.vhd src/clk_div.vhd src/fp_counter.vhd src/fp_add_sub.vhd src/fp_mul.vhd src/alu.vhd src/top.vhd
   TB: test/tb_top.vhd
 
 tasks:

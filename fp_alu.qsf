@@ -1,0 +1,86 @@
+# =============================================================================
+# Plik ustawien Quartus (settings) dla arytmometru FP na plytce Terasic DE2-115.
+# Uklad: Cyclone IV E  EP4CE115F29C7.
+#
+# Otworz projekt: Quartus Prime Lite -> File -> Open Project -> fp_alu.qpf
+# Kompilacja:     Processing -> Start Compilation (lub przycisk "play").
+# Wgranie:        Tools -> Programmer (kabel USB-Blaster wbudowany w plytke).
+#
+# UWAGA: numery pinow ponizej to standardowe przypisania DE2-115 (z System CD
+# Terasic). Jesli masz inna rewizje plytki, zweryfikuj je z plikiem .qsf
+# z przykladow producenta.
+# =============================================================================
+
+# --- Uklad i top-level ---
+set_global_assignment -name FAMILY "Cyclone IV E"
+set_global_assignment -name DEVICE EP4CE115F29C7
+set_global_assignment -name TOP_LEVEL_ENTITY top
+
+# --- Pliki zrodlowe (kolejnosc wazna: pakiet i moduly przed top) ---
+set_global_assignment -name VHDL_FILE src/fp_pkg.vhd
+set_global_assignment -name VHDL_FILE src/fp_normalize.vhd
+set_global_assignment -name VHDL_FILE src/clk_div.vhd
+set_global_assignment -name VHDL_FILE src/fp_counter.vhd
+set_global_assignment -name VHDL_FILE src/fp_add_sub.vhd
+set_global_assignment -name VHDL_FILE src/fp_mul.vhd
+set_global_assignment -name VHDL_FILE src/alu.vhd
+set_global_assignment -name VHDL_FILE src/top.vhd
+
+# --- Zegar 50 MHz ---
+set_location_assignment PIN_Y2 -to CLOCK_50
+
+# --- Przelaczniki SW[15:0] (SW[1:0] = operacja) ---
+set_location_assignment PIN_AB28 -to SW[0]
+set_location_assignment PIN_AC28 -to SW[1]
+set_location_assignment PIN_AC27 -to SW[2]
+set_location_assignment PIN_AD27 -to SW[3]
+set_location_assignment PIN_AB27 -to SW[4]
+set_location_assignment PIN_AC26 -to SW[5]
+set_location_assignment PIN_AD26 -to SW[6]
+set_location_assignment PIN_AB26 -to SW[7]
+set_location_assignment PIN_AC25 -to SW[8]
+set_location_assignment PIN_AB25 -to SW[9]
+set_location_assignment PIN_AC24 -to SW[10]
+set_location_assignment PIN_AB24 -to SW[11]
+set_location_assignment PIN_AB23 -to SW[12]
+set_location_assignment PIN_AA24 -to SW[13]
+set_location_assignment PIN_AA23 -to SW[14]
+set_location_assignment PIN_AA22 -to SW[15]
+
+# --- Przyciski KEY[3:0] (KEY[0] = reset, active-low) ---
+set_location_assignment PIN_M23 -to KEY[0]
+set_location_assignment PIN_M21 -to KEY[1]
+set_location_assignment PIN_N21 -to KEY[2]
+set_location_assignment PIN_R24 -to KEY[3]
+
+# --- Diody czerwone LEDR[15:0] (mantysa wyniku) ---
+set_location_assignment PIN_G19 -to LEDR[0]
+set_location_assignment PIN_F19 -to LEDR[1]
+set_location_assignment PIN_E19 -to LEDR[2]
+set_location_assignment PIN_F21 -to LEDR[3]
+set_location_assignment PIN_F18 -to LEDR[4]
+set_location_assignment PIN_E18 -to LEDR[5]
+set_location_assignment PIN_J19 -to LEDR[6]
+set_location_assignment PIN_H19 -to LEDR[7]
+set_location_assignment PIN_J17 -to LEDR[8]
+set_location_assignment PIN_G17 -to LEDR[9]
+set_location_assignment PIN_J15 -to LEDR[10]
+set_location_assignment PIN_H16 -to LEDR[11]
+set_location_assignment PIN_J16 -to LEDR[12]
+set_location_assignment PIN_H17 -to LEDR[13]
+set_location_assignment PIN_F15 -to LEDR[14]
+set_location_assignment PIN_G15 -to LEDR[15]
+
+# --- Diody zielone LEDG[8:0] (dolne bity wykladnika wyniku) ---
+set_location_assignment PIN_E21 -to LEDG[0]
+set_location_assignment PIN_E22 -to LEDG[1]
+set_location_assignment PIN_E25 -to LEDG[2]
+set_location_assignment PIN_E24 -to LEDG[3]
+set_location_assignment PIN_H21 -to LEDG[4]
+set_location_assignment PIN_G20 -to LEDG[5]
+set_location_assignment PIN_G22 -to LEDG[6]
+set_location_assignment PIN_G21 -to LEDG[7]
+set_location_assignment PIN_F17 -to LEDG[8]
+
+# --- Standard napieciowy I/O (DE2-115: banki 2.5V / 3.3V) ---
+set_global_assignment -name STRATIX_DEVICE_IO_STANDARD "3.3-V LVTTL"

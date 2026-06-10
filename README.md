@@ -3,6 +3,26 @@
 
 ---
 
+## Szybki start
+
+Toolchain (GHDL + GTKWave + go-task) dostarcza `flake.nix`. GHDL nie jest globalnie
+w `PATH` — uruchamiaj komendy przez `nix develop -c` (albo wejdź raz w shell przez
+`nix develop` / `direnv allow` i wołaj `task ...` bezpośrednio).
+
+```bash
+nix develop -c task test      # kompilacja + symulacja: 14 testów (assert PASS/FAIL)
+nix develop -c task wave      # to samo + podgląd przebiegów w GTKWave
+nix develop -c task clean     # usuń artefakty z build/
+nix develop -c task --list    # lista celów
+```
+
+`task test` to najszybszy sposób, żeby **zobaczyć jak na liczbach zmieniają się wyniki**
+— wypisuje wynik każdej operacji. Wgranie na fizyczną płytkę (DE2-115) opisuje
+[rozdział 8](#8-wgrywanie-na-płytkę); tam liczby na wejściu generują dwa liczniki,
+więc wynik zmienia się na diodach na żywo, bez rekompilacji.
+
+---
+
 ## Spis treści
 
 1. [Czym jest VHDL i jak myśleć o kodzie sprzętowym](#1-czym-jest-vhdl)
@@ -376,43 +396,54 @@ src/
 ├── fp_normalize.vhd  Moduł kombinacyjny: normalizuje mantysę
 ├── fp_add_sub.vhd    Moduł sekwencyjny: dodawanie i odejmowanie (FSM 4-stanowy)
 ├── fp_mul.vhd        Moduł sekwencyjny: mnożenie (FSM 3-stanowy)
-├── top.vhd           Top-level: łączy wszystko, podłącza do pinów płytki
-└── tb_top.vhd        Testbench: tylko do symulacji, steruje top jak "wirtualna płytka"
+├── alu.vhd           Jednostka arytmetyczna: a,b,op → result (add_sub + mul + mux)
+├── clk_div.vhd       Dzielnik zegara 50 MHz → ~4 Hz (input stage)
+├── fp_counter.vhd    Licznik generujący liczbę fp_t na wejście ALU (input stage)
+├── top.vhd           Wrapper płytki: liczniki podpięte na wejścia ALU, piny SW/KEY/LED
+└── tb_top.vhd        Testbench: tylko do symulacji, steruje wejściami jak "wirtualna płytka"
 ```
+
+Kluczowy podział: **`alu.vhd` to właściwy układ** (ma jawne wejścia A, B), a `clk_div` +
+`fp_counter` to *input stage* — generatory liczb **podpięte z zewnątrz** na wejścia ALU,
+dokładnie tak, jak stimulus podpina się w testbenchu. Liczniki nie są częścią ALU.
 
 ### Diagram zależności
 
 ```
 fp_pkg
   ↓ (używany przez wszystkich)
-fp_normalize ← fp_add_sub
-             ← fp_mul
-                  ↓
-fp_normalize ← fp_mul
-                  ↓
-             top
-              ↑
-           tb_top (tylko symulacja)
+fp_normalize ← fp_add_sub ─┐
+fp_normalize ← fp_mul     ─┴→ alu ─┐
+clk_div ───────────────────────────┤
+fp_counter ────────────────────────┴→ top
+                                        ↑
+                                     tb_top (tylko symulacja)
 ```
 
-Kolejność kompilacji musi być od dołu grafu w górę: `fp_pkg` → `fp_normalize` → `fp_add_sub` → `fp_mul` → `top` → `tb_top`.
+Kolejność kompilacji od dołu grafu: `fp_pkg` → `fp_normalize` → `clk_div` → `fp_counter` → `fp_add_sub` → `fp_mul` → `alu` → `top` → `tb_top`.
 
-### Schemat blokowy top.vhd
+### Schemat blokowy
 
 ```
-KEY[0] ──NOT──→ reset ──────────────────────────┐
-KEY[1] ──NOT──→ start ──────────┬───────────────┤
-SW[0]  ─────→ add_sub_op        │               │
-                                ▼               ▼
-A_IN ──────────────────→ [fp_add_sub] ──→ add_sub_result ──┐
-B_IN ──────────────────→                                    │
-                                                            ├──→ MUX ──→ LEDR (mantysa)
-A_IN ──────────────────→ [fp_mul]     ──→ mul_result    ──┤         └──→ LEDG (wykładnik [8:0])
-B_IN ──────────────────→                             ↑    │
-                                              SW[1:0]="10" └──────────────────────────────────┘
+                         UKLAD: alu.vhd
+                  ┌──────────────────────────────┐
+reset ────────────┼──────────────┬───────────────┤
+start ────────────┼──────┬───────┤               │
+SW[1:0] ─→ op ────┼──────┼───────┼───────┐       │
+                  │      ▼       ▼       │       │
+A ───[counter A]──┼→ [fp_add_sub] ─→ add_sub_result ─┐
+B ───[counter B]──┼→                          │      │
+       ▲          │                           ├──→ MUX ──→ LEDR (mantysa)
+   clk_div(~4Hz)  │  [fp_mul]     ─→ mul_result┤    │  └→ LEDG (wykładnik [8:0])
+                  │                       ↑    │    │
+                  │                op="10"└────┘    │
+                  └──────────────────────────────┘
+  input stage (top.vhd)        wynik wybierany przez MUX wg op
 ```
 
-Oba moduły obliczeniowe działają **równolegle** — oba startują jednocześnie gdy `start=1`. Multiplekser na końcu wybiera który wynik pokazać na LED.
+ALU: oba moduły obliczeniowe działają **równolegle** — startują jednocześnie gdy `start=1`,
+a multiplekser wybiera wynik wg `op`. W `top.vhd` wejścia A/B karmią dwa liczniki, a `start`
+jest generowany automatycznie po każdym ticku z `clk_div`.
 
 ---
 
@@ -614,10 +645,13 @@ Pliki muszą być kompilowane w takiej kolejności — moduł musi być skompilo
 ```
 1. fp_pkg.vhd
 2. fp_normalize.vhd
-3. fp_add_sub.vhd
-4. fp_mul.vhd
-5. top.vhd
-6. tb_top.vhd
+3. clk_div.vhd
+4. fp_counter.vhd
+5. fp_add_sub.vhd
+6. fp_mul.vhd
+7. alu.vhd
+8. top.vhd
+9. tb_top.vhd
 ```
 
 Aby skompilować: prawy klik na plik → `Compile` → `Compile Selected`, lub `Compile → Compile All` (ModelSim zazwyczaj sam rozpoznaje kolejność).
@@ -678,60 +712,57 @@ lub przy błędzie:
 
 ## 8. Wgrywanie na płytkę
 
+### Skąd biorą się liczby na wejściu (ważne!)
+
+Wejścia A i B **nie są już stałymi** — generują je dwa liczniki (`fp_counter`),
+taktowane powolnym impulsem z dzielnika zegara (`clk_div`, ~4 Hz). Dzięki temu na
+żywo widać, jak wynik zmienia się z liczbami, **bez rekompilacji**:
+
+- **A** inkrementuje co ~0.25 s, wartości `0, 1/16, 2/16, … 15/16` (mantysa, exp=0),
+- **B** inkrementuje dopiero gdy A zatoczy pełne kolo (jak licznik kilometrów),
+  więc z czasem przewijają się wszystkie kombinacje (A, B),
+- **start** obliczeń generowany jest automatycznie po każdym ticku.
+
 ### Wymagania
 
-- Zainstalowany Quartus II (dla Cyclone II) lub Quartus Prime Lite
-- Płytka DE1 lub podobna z Cyclone II
-- Kabel USB-Blaster (zazwyczaj wbudowany w płytkę)
+- Quartus Prime Lite (darmowy; obsługuje Cyclone IV E)
+- Płytka Terasic **DE2-115** (Cyclone IV E `EP4CE115F29C7`)
+- Kabel USB-Blaster (wbudowany w płytkę)
 
 ### Kroki w Quartus
 
-1. `File → New Project Wizard`
-2. Wybierz device: `Cyclone II EP2C20F484C7` (lub odpowiedni dla twojej płytki)
-3. Dodaj wszystkie pliki `.vhd` z folderu `src/` **poza** `tb_top.vhd` (testbench nie jest do syntezy)
-4. Ustaw `top` jako top-level entity: `Project → Set as Top-Level Entity`
-5. `Processing → Start Compilation` — kompilacja może trwać kilka minut
+W repozytorium jest gotowy projekt: **`fp_alu.qpf`** + **`fp_alu.qsf`** (lista plików
+źródłowych, device i przypisania pinów już ustawione).
 
-### Przypisanie pinów
+1. `File → Open Project` → wybierz `fp_alu.qpf`
+2. `Processing → Start Compilation` — kompilacja kilka minut (testbench `tb_top.vhd`
+   NIE jest dodany do projektu, bo nie syntetyzuje się)
+3. `Tools → Programmer` → `Add File` → `output_files/fp_alu.sof` → `Start`
 
-Przed wgraniem musisz przypisać porty encji `top` do fizycznych pinów płytki. W Quartus: `Assignments → Pin Planner`.
-
-Typowe przypisania dla DE1:
-```
-CLOCK_50  → PIN_L1
-KEY[0]    → PIN_R22
-KEY[1]    → PIN_R21
-SW[0]     → PIN_L22
-SW[1]     → PIN_L21
-LEDR[0]   → PIN_R17
-LEDR[1]   → PIN_R16
-... itd.
-LEDG[0]   → PIN_U22
-LEDG[1]   → PIN_U21
-... itd.
-```
-(Dokładne numery pinów znajdziesz w dokumentacji swojej płytki — plik `.qsf` z przykładowych projektów DE1)
-
-### Wgranie na płytkę
-
-1. `Tools → Programmer`
-2. `Add File` → wybierz wygenerowany plik `.sof` z folderu `output_files`
-3. Kliknij `Start`
+> Jeśli wolisz złożyć projekt ręcznie: device `EP4CE115F29C7`, top-level entity `top`,
+> dodaj wszystkie `.vhd` z `src/` (bez `tb_top.vhd`), a piny skopiuj z `fp_alu.qsf`.
+> Numery pinów w `.qsf` to standard DE2-115 — przy innej rewizji płytki zweryfikuj je
+> z plikiem `.qsf` z System CD Terasic.
 
 ### Testowanie na płytce
 
-Przełączniki i przyciski:
-- `KEY[0]` (wciśnij) = reset
-- `KEY[1]` (wciśnij jednokrotnie) = start obliczeń
+- `KEY[0]` (wciśnij) = **reset** (zeruje liczniki i FSM)
 - `SW[1:0]` = wybór operacji: `00`=ADD, `01`=SUB, `10`=MUL
+- start jest automatyczny — po resecie wystarczy patrzeć, liczby same się zmieniają
 
-Wynik wyświetlany binarnie: mantysa na `LEDR[15:0]`, dolne 9 bitów wykładnika na `LEDG[8:0]`.
+Wynik binarnie: mantysa na `LEDR[15:0]`, dolne 9 bitów wykładnika na `LEDG[8:0]`.
 
-Zmianę testowanych liczb A i B wykonujesz przez edycję stałych `A_IN` i `B_IN` w pliku `top.vhd` i ponowną kompilację.
+> Tempo zmian ustawia parametr `CLK_DIV_MAX` w `top.vhd` (domyślnie 12_500_000 ≈ 4 Hz).
+> Mniejsza wartość = szybciej. Zakres liczb zmienia `WIDTH` w `fp_counter.vhd`.
 
 ---
 
 ## 9. Oczekiwane wyniki
+
+> Poniższa para A=1.0, B=0.5 to **wartości przykładowe** do prześledzenia algorytmu.
+> W testbenchu sprawdzamy je (i wiele przypadków brzegowych) podając wprost na
+> instancje `fp_add_sub`/`fp_mul`. Na płytce wejścia generują liczniki (rozdział 8),
+> więc realne A i B zmieniają się w czasie — matematyka pozostaje ta sama.
 
 ### Wartości testowe
 

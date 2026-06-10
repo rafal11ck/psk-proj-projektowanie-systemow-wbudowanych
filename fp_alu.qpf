@@ -1,0 +1,6 @@
+QUARTUS_VERSION = "21.1"
+
+# Plik projektu Quartus dla arytmometru FP.
+# Otworz w Quartus Prime Lite: File -> Open Project -> fp_alu.qpf
+
+PROJECT_REVISION = "fp_alu"

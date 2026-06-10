@@ -1,16 +1,21 @@
 -- Testbench dla calego projektu - 14 testow.
 -- Dwie sciezki testowe:
---   1) Przez top.vhd (testy 1-3): integracja modulu mux + obsluga KEY/SW/LEDR/LEDG.
---      Top ma hardcoded A_IN=1.0, B_IN=0.5 wiec testowane sa tylko bazowe operacje.
+--   1) Przez top.vhd (testy 1-3): integracja licznikow + clk_div + auto-start +
+--      mux + obsluga KEY/SW/LEDR/LEDG. Top napedzany jest dwoma licznikami
+--      (fp_counter), wiec sprawdzamy stan po PIERWSZYM ticku (A=1/16, B=0).
+--      DIV_MAX nadpisane na 6, zeby tick przychodzil szybko w symulacji.
 --   2) Przez bezposrednie instancje fp_add_sub i fp_mul (testy 4-14): przypadki
---      brzegowe z dowolnymi wartosciami a, b.
+--      brzegowe z dowolnymi wartosciami a, b (pelne pokrycie algorytmu, w tym
+--      oba operandy niezerowe -- czego sciezka top nie sprawdza wprost).
 --
+-- Struktura: top.vhd = liczniki (input stage) + alu.vhd; alu.vhd = fp_add_sub + fp_mul + mux.
 -- W GTKWave (task wave) widoczna jest cala hierarchia:
---   tb_top/dut_top/...               sygnaly top.vhd (reset_sig, start_sig, LEDR, LEDG)
---   tb_top/dut_top/add_sub_inst/...  rejestry fp_add_sub uzytego w top.vhd
---   tb_top/dut_top/mul_inst/...      rejestry fp_mul uzytego w top.vhd
---   tb_top/dut_add_sub/...           dodatkowa instancja fp_add_sub (testy brzegowe)
---   tb_top/dut_mul/...               dodatkowa instancja fp_mul (testy brzegowe)
+--   tb_top/dut_top/...                       sygnaly top.vhd (reset_sig, start_sig, a_in, b_in, LEDR, LEDG)
+--   tb_top/dut_top/alu_inst/...              sygnaly alu.vhd (mux wyniku)
+--   tb_top/dut_top/alu_inst/add_sub_inst/... rejestry fp_add_sub w ALU
+--   tb_top/dut_top/alu_inst/mul_inst/...     rejestry fp_mul w ALU
+--   tb_top/dut_add_sub/...                   dodatkowa instancja fp_add_sub (testy brzegowe)
+--   tb_top/dut_mul/...                       dodatkowa instancja fp_mul (testy brzegowe)
 -- Uruchomienie: task test (lub task wave dla GTKWave)
 
 library ieee;
@@ -54,9 +59,10 @@ architecture sim of tb_top is
 
 begin
 
-    -- DUT 1: top.vhd - testy bazowe przez interfejs plytki.
-    -- Stale A_IN=1.0, B_IN=0.5 hardcoded w top.vhd.
+    -- DUT 1: top.vhd - testy integracji przez interfejs plytki.
+    -- DIV_MAX=6 => tick co 7 cykli (szybko, dla symulacji).
     dut_top : entity work.top
+        generic map ( CLK_DIV_MAX => 6 )
         port map (
             CLOCK_50 => clk,
             SW       => sw,
@@ -109,62 +115,75 @@ begin
         key   <= "1111";
         wait for CLK_PERIOD;
 
-        -- TESTY PRZEZ TOP.VHD (sciezka 1, A=1.0/B=0.5 hardcoded)
+        -- TESTY PRZEZ TOP.VHD (sciezka 1, wejscia z licznikow)
+        --
+        -- Po resecie liczniki sa w 0. Pierwszy tick (DIV_MAX=6 -> 7 zbocze po
+        -- deasercji resetu) inkrementuje licznik A do 1, B zostaje 0:
+        --   A = 1/16 = 0.0625 (mantysa 0x0800, exp 0),   B = 0.
+        -- Auto-start odpala obliczenie; wynik jest gotowy po ~11 zboczu i stabilny
+        -- az do 2. ticku. Liczymy 13 zbocz po deasercji resetu i probkujemy.
 
-        -- TEST 1: top ADD (SW[1:0]="00") -> 1.0 + 0.5 = 1.5
-        -- ALIGN: idiff=1 -> mB'=0x2000; SUM: 0x4000+0x2000=0x6000; bez overflow
-        -- LEDR=0x6000 (mantysa=+0.75), LEDG=000000001 (wykladnik=1)
+        -- TEST 1: top ADD (SW[1:0]="00") -> 0.0625 + 0 = 0.0625
+        -- COMPUTE: 0x0800 + 0 = 0x0800; bez overflow.
+        -- NORMALIZE: 0x0800 -> 3 shifty -> 0x4000, exp = -3.
+        -- LEDR=0x4000 (mantysa=+0.5), LEDG = (-3)[8:0] = "111111101".
+        key <= "1110";                                          -- reset top (liczniki -> 0)
         sw(1 downto 0) <= "00";
-        wait for CLK_PERIOD;
-        key <= "1101"; wait for CLK_PERIOD; key <= "1111";
-        wait for 6 * CLK_PERIOD;
+        for i in 1 to 3 loop wait until rising_edge(clk); end loop;
+        key <= "1111";                                          -- zwolnij reset
+        for i in 1 to 13 loop wait until rising_edge(clk); end loop;
 
-        assert ledr = x"6000"
-            report "TEST 1 FAIL: top ADD 1.0+0.5, oczekiwano LEDR=0x6000" severity ERROR;
-        assert ledr /= x"6000"
-            report "TEST 1 PASS: top ADD 1.0+0.5 -> LEDR=0x6000 (mantysa=+0.75)" severity NOTE;
-        assert ledg = "000000001"
-            report "TEST 1 FAIL: top ADD, oczekiwano LEDG=1 (wykladnik=1)" severity ERROR;
-        assert ledg /= "000000001"
-            report "TEST 1 PASS: top ADD -> LEDG=1 (wykladnik=1)" severity NOTE;
+        assert ledr = x"4000"
+            report "TEST 1 FAIL: top ADD 0.0625+0, oczekiwano LEDR=0x4000" severity ERROR;
+        assert ledr /= x"4000"
+            report "TEST 1 PASS: top ADD 0.0625+0 -> LEDR=0x4000 (mantysa=+0.5)" severity NOTE;
+        assert ledg = "111111101"
+            report "TEST 1 FAIL: top ADD, oczekiwano LEDG=-3 (111111101)" severity ERROR;
+        assert ledg /= "111111101"
+            report "TEST 1 PASS: top ADD -> LEDG=-3 (po normalizacji 0.0625)" severity NOTE;
 
         wait for 2 * CLK_PERIOD;
 
-        -- TEST 2: top SUB (SW[1:0]="01") -> 1.0 - 0.5 = 0.5
-        -- LEDR=0x4000 (mantysa=+0.5), LEDG=0
+        -- TEST 2: top SUB (SW[1:0]="01") -> 0.0625 - 0 = 0.0625
+        -- COMPUTE: 0x0800 - 0 = 0x0800; reszta jak TEST 1.
+        -- LEDR=0x4000, LEDG="111111101".
+        key <= "1110";
         sw(1 downto 0) <= "01";
-        wait for CLK_PERIOD;
-        key <= "1101"; wait for CLK_PERIOD; key <= "1111";
-        wait for 6 * CLK_PERIOD;
+        for i in 1 to 3 loop wait until rising_edge(clk); end loop;
+        key <= "1111";
+        for i in 1 to 13 loop wait until rising_edge(clk); end loop;
 
         assert ledr = x"4000"
-            report "TEST 2 FAIL: top SUB 1.0-0.5, oczekiwano LEDR=0x4000" severity ERROR;
+            report "TEST 2 FAIL: top SUB 0.0625-0, oczekiwano LEDR=0x4000" severity ERROR;
         assert ledr /= x"4000"
-            report "TEST 2 PASS: top SUB 1.0-0.5 -> LEDR=0x4000 (mantysa=+0.5)" severity NOTE;
-        assert ledg = "000000000"
-            report "TEST 2 FAIL: top SUB, oczekiwano LEDG=0" severity ERROR;
-        assert ledg /= "000000000"
-            report "TEST 2 PASS: top SUB -> LEDG=0 (wykladnik=0)" severity NOTE;
+            report "TEST 2 PASS: top SUB 0.0625-0 -> LEDR=0x4000 (mantysa=+0.5)" severity NOTE;
+        assert ledg = "111111101"
+            report "TEST 2 FAIL: top SUB, oczekiwano LEDG=-3 (111111101)" severity ERROR;
+        assert ledg /= "111111101"
+            report "TEST 2 PASS: top SUB -> LEDG=-3" severity NOTE;
 
         wait for 2 * CLK_PERIOD;
 
-        -- TEST 3: top MUL (SW[1:0]="10") -> 1.0 * 0.5 = 0.5
-        -- product[30:15] = 0x2000; po normalizacji 0x4000, exp=0
-        -- LEDR=0x4000, LEDG=0
+        -- TEST 3: top MUL (SW[1:0]="10") -> 0.0625 * 0 = 0
+        -- COMPUTE: product=0 -> mantysa=0, exp=0+0=0; NORMALIZE pomija zero.
+        -- LEDR=0x0000, LEDG=0.
+        key <= "1110";
         sw(1 downto 0) <= "10";
-        wait for CLK_PERIOD;
-        key <= "1101"; wait for CLK_PERIOD; key <= "1111";
-        wait for 6 * CLK_PERIOD;
+        for i in 1 to 3 loop wait until rising_edge(clk); end loop;
+        key <= "1111";
+        for i in 1 to 13 loop wait until rising_edge(clk); end loop;
 
-        assert ledr = x"4000"
-            report "TEST 3 FAIL: top MUL 1.0*0.5, oczekiwano LEDR=0x4000" severity ERROR;
-        assert ledr /= x"4000"
-            report "TEST 3 PASS: top MUL 1.0*0.5 -> LEDR=0x4000 (mantysa=+0.5)" severity NOTE;
+        assert ledr = x"0000"
+            report "TEST 3 FAIL: top MUL 0.0625*0, oczekiwano LEDR=0x0000" severity ERROR;
+        assert ledr /= x"0000"
+            report "TEST 3 PASS: top MUL 0.0625*0 -> LEDR=0x0000 (mnozenie przez 0)" severity NOTE;
         assert ledg = "000000000"
             report "TEST 3 FAIL: top MUL, oczekiwano LEDG=0" severity ERROR;
         assert ledg /= "000000000"
             report "TEST 3 PASS: top MUL -> LEDG=0" severity NOTE;
 
+        -- Od teraz top tyka swobodnie w tle; testy 4-14 uzywaja osobnych instancji.
+        key <= "1111";
         wait for 2 * CLK_PERIOD;
 
         -- TESTY BRZEGOWE ADD/SUB (sciezka 2, dowolne a, b)

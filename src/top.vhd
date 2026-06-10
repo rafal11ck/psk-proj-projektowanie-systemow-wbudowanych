@@ -1,10 +1,18 @@
--- Top-level: laczy wszystkie moduly i podlacza do pinow plytki.
--- Schemat blokowy i opis pinow: README.md rozdzial 4 i 8.
+-- Top-level (wrapper plytki): podlacza wejscia/wyjscia do pinow plytki.
+-- WLASCIWY uklad arytmetyczny jest w alu.vhd; tutaj tylko go instancjonujemy
+-- i KARMIMY jego wejscia.
 --
--- Testowane wartosci (zmien A_IN/B_IN zeby testowac inne przypadki):
---   A = 1.0  (mantissa=0x4000=+0.5, exponent=1  ->  0.5 * 2^1 = 1.0)
---   B = 0.5  (mantissa=0x4000=+0.5, exponent=0  ->  0.5 * 2^0 = 0.5)
--- Oczekiwane wyniki: ADD->0x6000/e=1, SUB->0x4000/e=0, MUL->0x4000/e=0
+-- LICZNIKI SA PODPIETE NA WEJSCIE alu (porty a/b) -- z zewnatrz, tak samo jak
+-- stimulus w testbenchu. NIE sa czescia ukladu arytmetycznego.
+--   clk_div spowalnia 50 MHz do ~4 Hz (tick),
+--   licznik A inkrementuje co tick,
+--   licznik B inkrementuje gdy A zatoczy pelne kolo (odometr) -> przewijaja sie
+--   wszystkie kombinacje (A, B),
+--   start generowany jest automatycznie po kazdym ticku.
+-- Dzieki temu na diodach widac na zywo, jak wynik zmienia sie z liczbami.
+--
+-- STEROWANIE: KEY[0]=reset (active-low), SW[1:0]=operacja (00=ADD,01=SUB,10=MUL).
+-- WYNIK: mantysa -> LEDR[15:0], dolne bity wykladnika -> LEDG[8:0].
 
 library ieee;
 use ieee.std_logic_1164.all;
@@ -12,80 +20,98 @@ use ieee.numeric_std.all;
 use work.fp_pkg.all;
 
 entity top is
+    generic (
+        -- Dzielnik zegara: tick co (CLK_DIV_MAX+1) cykli. ~4 Hz dla 50 MHz.
+        -- Testbench nadpisuje mala wartoscia, zeby symulacja byla szybka.
+        CLK_DIV_MAX : natural := 12_500_000
+    );
     port (
         CLOCK_50 : in  std_logic;
         SW       : in  std_logic_vector(15 downto 0);  -- SW[1:0] = operacja
         KEY      : in  std_logic_vector(3  downto 0);  -- active-low: wcisniety='0'
-        LEDR     : out std_logic_vector(15 downto 0);  -- mantysa wyniku na diodach
+        LEDR     : out std_logic_vector(15 downto 0);  -- mantysa wyniku
         LEDG     : out std_logic_vector(8  downto 0)   -- dolne bity wykladnika wyniku
     );
 end entity;
 
 architecture rtl of top is
 
-    -- constant zamiast signal: wartosc nigdy sie nie zmienia po syntezie.
-    -- to_signed(16#4000#, 16): konwertuj hex 0x4000 na signed 16-bitowy.
-    -- 16#...# to notacja VHDL dla hex (odpowiednik 0x... w C).
-    constant A_IN : fp_t := (
-        mantissa => to_signed(16#4000#, 16),
-        exponent => to_signed(1, 16)
-    );
-    constant B_IN : fp_t := (
-        mantissa => to_signed(16#4000#, 16),
-        exponent => to_signed(0, 16)
-    );
-
     signal reset_sig  : std_logic;
-    signal start_sig  : std_logic;
-    signal add_sub_op : std_logic;
+    signal tick       : std_logic;  -- impuls ~4 Hz z dzielnika
+    signal carry_a    : std_logic;  -- '1' gdy licznik A sie przewija (taktuje B)
+    signal start_sig  : std_logic;  -- auto-start: tick opozniony o 1 cykl
 
-    signal add_sub_result : fp_t;
-    signal mul_result     : fp_t;
-    signal add_sub_done   : std_logic;
-    signal mul_done       : std_logic;
+    -- Wejscia ALU generowane przez liczniki (input stage):
+    signal a_in       : fp_t;
+    signal b_in       : fp_t;
+
+    -- Wyjscie ALU:
+    signal alu_result : fp_t;
 
 begin
 
-    -- Przyciski KEY sa active-low (wcisniety = '0').
-    -- "not KEY(0)" odwraca logike: wcisniety -> reset_sig='1' (active high dla naszych modulow).
-    reset_sig  <= not KEY(0);
-    start_sig  <= not KEY(1);
-    add_sub_op <= SW(0);  -- bit0: 0=ADD, 1=SUB (irrelevant gdy SW[1]='1' = MUL)
+    -- KEY[0] active-low: wcisniety -> reset_sig='1' (active high dla modulow).
+    reset_sig <= not KEY(0);
 
-    -- Instancje modulow. Oba dostaja te same wejscia i dzialaja rownoleglie.
-    -- Multiplekser na koncu wybiera ktory wynik pokazac.
-    add_sub_inst : entity work.fp_add_sub
+    -- === INPUT STAGE: generatory liczb podpiete na wejscia ALU ===
+
+    -- Dzielnik zegara 50 MHz -> powolny impuls 'tick'.
+    clkdiv_inst : entity work.clk_div
+        generic map ( DIV_MAX => CLK_DIV_MAX )
+        port map (
+            clk   => CLOCK_50,
+            reset => reset_sig,
+            tick  => tick
+        );
+
+    -- Licznik A: tyka na kazdy tick.
+    counter_a_inst : entity work.fp_counter
+        port map (
+            clk   => CLOCK_50,
+            reset => reset_sig,
+            en    => tick,
+            value => a_in,
+            carry => carry_a
+        );
+
+    -- Licznik B: tyka dopiero gdy A sie przewinie (odometr).
+    counter_b_inst : entity work.fp_counter
+        port map (
+            clk   => CLOCK_50,
+            reset => reset_sig,
+            en    => carry_a,
+            value => b_in,
+            carry => open
+        );
+
+    -- Auto-start: impuls startu jeden cykl po ticku. Opoznienie o 1 cykl
+    -- gwarantuje, ze a_in/b_in (zmienione na ticku) sa juz stabilne, gdy ALU je zatrzaskuje.
+    process(CLOCK_50)
+    begin
+        if rising_edge(CLOCK_50) then
+            if reset_sig = '1' then
+                start_sig <= '0';
+            else
+                start_sig <= tick;
+            end if;
+        end if;
+    end process;
+
+    -- === UKLAD ARYTMETYCZNY: liczniki podpiete na jego wejscia a/b ===
+    alu_inst : entity work.alu
         port map (
             clk    => CLOCK_50,
             reset  => reset_sig,
             start  => start_sig,
-            op     => add_sub_op,
-            a      => A_IN,
-            b      => B_IN,
-            result => add_sub_result,
-            done   => add_sub_done
+            op     => SW(1 downto 0),
+            a      => a_in,
+            b      => b_in,
+            result => alu_result,
+            done   => open
         );
 
-    mul_inst : entity work.fp_mul
-        port map (
-            clk    => CLOCK_50,
-            reset  => reset_sig,
-            start  => start_sig,
-            a      => A_IN,
-            b      => B_IN,
-            result => mul_result,
-            done   => mul_done
-        );
-
-    -- "with ... select": kombinacyjny multiplekser (odpowiednik switch/case poza procesem).
-    -- std_logic_vector(x): konwertuje signed x na std_logic_vector -- tylko reinterpretacja bitow.
-    -- OP_MUL zdefiniowane w fp_pkg jako "10"; "when others" lapie ADD i SUB.
-    with SW(1 downto 0) select
-        LEDR <= std_logic_vector(mul_result.mantissa)     when OP_MUL,
-                std_logic_vector(add_sub_result.mantissa) when others;
-
-    with SW(1 downto 0) select
-        LEDG <= std_logic_vector(mul_result.exponent(8 downto 0))     when OP_MUL,
-                std_logic_vector(add_sub_result.exponent(8 downto 0)) when others;
+    -- Wynik na diody. std_logic_vector(x): reinterpretacja bitow signed -> wektor.
+    LEDR <= std_logic_vector(alu_result.mantissa);
+    LEDG <= std_logic_vector(alu_result.exponent(8 downto 0));
 
 end architecture;
