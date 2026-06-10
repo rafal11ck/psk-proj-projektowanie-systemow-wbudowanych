@@ -5,14 +5,17 @@
 -- LICZNIKI SA PODPIETE NA WEJSCIE alu (porty a/b) -- z zewnatrz, tak samo jak
 -- stimulus w testbenchu. NIE sa czescia ukladu arytmetycznego.
 --   clk_div spowalnia 50 MHz do ~4 Hz (tick),
---   licznik A inkrementuje co tick,
---   licznik B inkrementuje gdy A zatoczy pelne kolo (odometr) -> przewijaja sie
---   wszystkie kombinacje (A, B),
+--   licznik A przechodzi przez dodatnia i ujemna pile co tick,
+--   licznik B robi to samo, ale dopiero gdy A zatoczy pelne kolo (odometr),
+--   dzieki czemu przewijaja sie wszystkie kombinacje (A, B),
 --   start generowany jest automatycznie po kazdym ticku.
 -- Dzieki temu na diodach widac na zywo, jak wynik zmienia sie z liczbami.
 --
--- STEROWANIE: KEY[0]=reset (active-low), SW[1:0]=operacja (00=ADD,01=SUB,10=MUL).
--- WYNIK: mantysa -> LEDR[15:0], dolne bity wykladnika -> LEDG[8:0].
+-- STEROWANIE:
+--   KEY[0]   = reset (active-low)
+--   SW[1:0]  = operacja (00=ADD, 01=SUB, 10=MUL)
+--   SW[3:2]  = podglad LEDR (00=wynik, 01=A, 10=B)
+-- LEDG pokazuje dolne bity wykladnika wyniku.
 
 library ieee;
 use ieee.std_logic_1164.all;
@@ -64,7 +67,7 @@ begin
             tick  => tick
         );
 
-    -- Licznik A: tyka na kazdy tick.
+    -- Licznik A: szybka pila signed, tyka na kazdy tick.
     counter_a_inst : entity work.fp_counter
         port map (
             clk   => CLOCK_50,
@@ -74,7 +77,7 @@ begin
             carry => carry_a
         );
 
-    -- Licznik B: tyka dopiero gdy A sie przewinie (odometr).
+    -- Licznik B: wolna pila signed, tyka po pelnym obiegu A (odometr).
     counter_b_inst : entity work.fp_counter
         port map (
             clk   => CLOCK_50,
@@ -110,8 +113,13 @@ begin
             done   => open
         );
 
-    -- Wynik na diody. std_logic_vector(x): reinterpretacja bitow signed -> wektor.
-    LEDR <= std_logic_vector(alu_result.mantissa);
+    -- SW[3:2] pozwala sprawdzic na tych samych LED-ach wejscia i wynik.
+    with SW(3 downto 2) select
+        LEDR <= std_logic_vector(alu_result.mantissa) when "00",
+                std_logic_vector(a_in.mantissa)       when "01",
+                std_logic_vector(b_in.mantissa)       when "10",
+                std_logic_vector(alu_result.mantissa) when others;
+
     LEDG <= std_logic_vector(alu_result.exponent(8 downto 0));
 
 end architecture;

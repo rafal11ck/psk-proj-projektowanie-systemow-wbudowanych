@@ -14,16 +14,20 @@
 # --- Uklad i top-level ---
 set_global_assignment -name FAMILY "Cyclone IV E"
 set_global_assignment -name DEVICE EP4CE115F29C7
-set_global_assignment -name TOP_LEVEL_ENTITY top
+set_global_assignment -name TOP_LEVEL_ENTITY demo
 
 # --- Pliki zrodlowe (kolejnosc wazna: pakiet i moduly przed top) ---
 set_global_assignment -name VHDL_FILE src/fp_pkg.vhd
 set_global_assignment -name VHDL_FILE src/fp_normalize.vhd
 set_global_assignment -name VHDL_FILE src/clk_div.vhd
 set_global_assignment -name VHDL_FILE src/fp_counter.vhd
+set_global_assignment -name VHDL_FILE src/fp_counter_bdf.vhd
+set_global_assignment -name VHDL_FILE src/start_delay.vhd
 set_global_assignment -name VHDL_FILE src/fp_add_sub.vhd
 set_global_assignment -name VHDL_FILE src/fp_mul.vhd
 set_global_assignment -name VHDL_FILE src/alu.vhd
+set_global_assignment -name VHDL_FILE src/alu_bdf.vhd
+set_global_assignment -name VHDL_FILE src/led_monitor_bdf.vhd
 set_global_assignment -name VHDL_FILE src/top.vhd
 
 # --- Zegar 50 MHz ---
@@ -84,3 +88,17 @@ set_location_assignment PIN_F17 -to LEDG[8]
 
 # --- Standard napieciowy I/O (DE2-115: banki 2.5V / 3.3V) ---
 set_global_assignment -name STRATIX_DEVICE_IO_STANDARD "3.3-V LVTTL"
+
+set_global_assignment -name LAST_QUARTUS_VERSION 13.1
+
+
+set_global_assignment -name BDF_FILE demo.bdf
+set_global_assignment -name PARTITION_NETLIST_TYPE SOURCE -section_id Top
+set_global_assignment -name PARTITION_FITTER_PRESERVATION_LEVEL PLACEMENT_AND_ROUTING -section_id Top
+set_global_assignment -name PARTITION_COLOR 16764057 -section_id Top
+set_global_assignment -name VECTOR_WAVEFORM_FILE Waveform.vwf
+set_global_assignment -name EDA_SIMULATION_TOOL "ModelSim-Altera (Verilog)"
+set_global_assignment -name EDA_OUTPUT_DATA_FORMAT "VERILOG HDL" -section_id eda_simulation
+set_global_assignment -name EDA_NETLIST_WRITER_OUTPUT_DIR "simulation/qsim/" -section_id eda_simulation
+set_global_assignment -name EDA_GENERATE_FUNCTIONAL_NETLIST ON -section_id eda_simulation
+set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top

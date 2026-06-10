@@ -15,6 +15,7 @@ greybox_tmp/
 *.sld
 *.qarlog
 *.qar
+*.done
 
 # Editor / OS
 .DS_Store

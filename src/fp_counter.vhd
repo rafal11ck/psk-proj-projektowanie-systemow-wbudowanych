@@ -2,11 +2,12 @@
 -- Inkrementuje sie o 1 na kazdy impuls 'en' (czyli na kazdy tick z clk_div).
 --
 -- Mapowanie licznika na fp_t:
---   value = cnt / 2^WIDTH  (mantysa Q1.15, exponent = 0)
---   WIDTH=4 -> cnt 0..15 -> wartosci 0, 0.0625, 0.125, ... 0.9375 (krok 1/16).
--- Licznik trzyma sie wiec w zakresie [0, 1) i kazda wartosc jest czytelna.
+--   value = cnt / 2^(WIDTH-1)  (mantysa Q1.15, exponent = 0)
+--   WIDTH=4 -> 0, 1/8, ... 7/8, -1, -7/8, ... -1/8, 0.
+-- Po maksimum dodatnim kod U2 automatycznie przechodzi do -1, zgodnie z
+-- przebiegiem pily omawianym podczas konsultacji.
 --
--- 'carry' sygnalizuje przewiniecie (cnt z maksimum na 0) -- uzywane w top.vhd,
+-- 'carry' sygnalizuje pelny obieg (cnt z -1/8 na 0) -- uzywane w top.vhd,
 -- zeby drugi licznik (B) tykal dopiero gdy pierwszy (A) zatoczy pelne kolo
 -- (jak licznik kilometrow): z czasem przewijaja sie wszystkie kombinacje (A, B).
 
@@ -29,8 +30,12 @@ entity fp_counter is
 end entity;
 
 architecture rtl of fp_counter is
-    signal cnt : unsigned(WIDTH-1 downto 0) := (others => '0');
+    signal cnt : signed(WIDTH-1 downto 0) := (others => '0');
 begin
+
+    assert WIDTH >= 2 and WIDTH <= 16
+        report "fp_counter WIDTH must be in range 2..16"
+        severity failure;
 
     process(clk)
     begin
@@ -38,18 +43,17 @@ begin
             if reset = '1' then
                 cnt <= (others => '0');
             elsif en = '1' then
-                cnt <= cnt + 1;   -- przepelnienie zawija automatycznie do 0
+                cnt <= cnt + 1;   -- U2: max dodatni -> min ujemny, -1 -> 0
             end if;
         end if;
     end process;
 
-    -- Przewiniecie: licznik jest na maksimum i wlasnie go inkrementujemy.
-    carry <= '1' when (en = '1' and cnt = (2**WIDTH - 1)) else '0';
+    -- Pelny obieg konczy sie przy przejsciu z kodu -1 na 0.
+    carry <= '1' when (en = '1' and cnt = to_signed(-1, WIDTH)) else '0';
 
-    -- Mantysa Q1.15: wsuwamy licznik w gorne bity (shift_left o 15-WIDTH).
-    -- resize(cnt, 16) rozszerza do 16 bitow (zerami), signed(...) reinterpretuje
-    -- jako liczbe ze znakiem -- zawsze dodatnia, bo gorne bity sa zerowe.
-    value.mantissa <= shift_left(signed(resize(cnt, 16)), 15 - WIDTH);
+    -- Mantysa Q1.15: zachowujemy znak i wsuwamy kod WIDTH-bitowy w najstarsze
+    -- bity. Dla WIDTH=4 krok wynosi 1/8, a 1000 oznacza dokladnie -1.
+    value.mantissa <= shift_left(resize(cnt, 16), 16 - WIDTH);
     value.exponent <= (others => '0');
 
 end architecture;

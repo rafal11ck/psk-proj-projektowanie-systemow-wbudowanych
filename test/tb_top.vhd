@@ -2,7 +2,7 @@
 -- Dwie sciezki testowe:
 --   1) Przez top.vhd (testy 1-3): integracja licznikow + clk_div + auto-start +
 --      mux + obsluga KEY/SW/LEDR/LEDG. Top napedzany jest dwoma licznikami
---      (fp_counter), wiec sprawdzamy stan po PIERWSZYM ticku (A=1/16, B=0).
+--      (fp_counter), wiec sprawdzamy stan po PIERWSZYM ticku (A=1/8, B=0).
 --      DIV_MAX nadpisane na 6, zeby tick przychodzil szybko w symulacji.
 --   2) Przez bezposrednie instancje fp_add_sub i fp_mul (testy 4-14): przypadki
 --      brzegowe z dowolnymi wartosciami a, b (pelne pokrycie algorytmu, w tym
@@ -119,14 +119,14 @@ begin
         --
         -- Po resecie liczniki sa w 0. Pierwszy tick (DIV_MAX=6 -> 7 zbocze po
         -- deasercji resetu) inkrementuje licznik A do 1, B zostaje 0:
-        --   A = 1/16 = 0.0625 (mantysa 0x0800, exp 0),   B = 0.
+        --   A = 1/8 = 0.125 (mantysa 0x1000, exp 0),   B = 0.
         -- Auto-start odpala obliczenie; wynik jest gotowy po ~11 zboczu i stabilny
         -- az do 2. ticku. Liczymy 13 zbocz po deasercji resetu i probkujemy.
 
-        -- TEST 1: top ADD (SW[1:0]="00") -> 0.0625 + 0 = 0.0625
-        -- COMPUTE: 0x0800 + 0 = 0x0800; bez overflow.
-        -- NORMALIZE: 0x0800 -> 3 shifty -> 0x4000, exp = -3.
-        -- LEDR=0x4000 (mantysa=+0.5), LEDG = (-3)[8:0] = "111111101".
+        -- TEST 1: top ADD (SW[1:0]="00") -> 0.125 + 0 = 0.125
+        -- COMPUTE: 0x1000 + 0 = 0x1000; bez overflow.
+        -- NORMALIZE: 0x1000 -> 2 shifty -> 0x4000, exp = -2.
+        -- LEDR=0x4000 (mantysa=+0.5), LEDG = (-2)[8:0] = "111111110".
         key <= "1110";                                          -- reset top (liczniki -> 0)
         sw(1 downto 0) <= "00";
         for i in 1 to 3 loop wait until rising_edge(clk); end loop;
@@ -134,19 +134,19 @@ begin
         for i in 1 to 13 loop wait until rising_edge(clk); end loop;
 
         assert ledr = x"4000"
-            report "TEST 1 FAIL: top ADD 0.0625+0, oczekiwano LEDR=0x4000" severity ERROR;
+            report "TEST 1 FAIL: top ADD 0.125+0, oczekiwano LEDR=0x4000" severity ERROR;
         assert ledr /= x"4000"
-            report "TEST 1 PASS: top ADD 0.0625+0 -> LEDR=0x4000 (mantysa=+0.5)" severity NOTE;
-        assert ledg = "111111101"
-            report "TEST 1 FAIL: top ADD, oczekiwano LEDG=-3 (111111101)" severity ERROR;
-        assert ledg /= "111111101"
-            report "TEST 1 PASS: top ADD -> LEDG=-3 (po normalizacji 0.0625)" severity NOTE;
+            report "TEST 1 PASS: top ADD 0.125+0 -> LEDR=0x4000 (mantysa=+0.5)" severity NOTE;
+        assert ledg = "111111110"
+            report "TEST 1 FAIL: top ADD, oczekiwano LEDG=-2 (111111110)" severity ERROR;
+        assert ledg /= "111111110"
+            report "TEST 1 PASS: top ADD -> LEDG=-2 (po normalizacji 0.125)" severity NOTE;
 
         wait for 2 * CLK_PERIOD;
 
-        -- TEST 2: top SUB (SW[1:0]="01") -> 0.0625 - 0 = 0.0625
-        -- COMPUTE: 0x0800 - 0 = 0x0800; reszta jak TEST 1.
-        -- LEDR=0x4000, LEDG="111111101".
+        -- TEST 2: top SUB (SW[1:0]="01") -> 0.125 - 0 = 0.125
+        -- COMPUTE: 0x1000 - 0 = 0x1000; reszta jak TEST 1.
+        -- LEDR=0x4000, LEDG="111111110".
         key <= "1110";
         sw(1 downto 0) <= "01";
         for i in 1 to 3 loop wait until rising_edge(clk); end loop;
@@ -154,17 +154,17 @@ begin
         for i in 1 to 13 loop wait until rising_edge(clk); end loop;
 
         assert ledr = x"4000"
-            report "TEST 2 FAIL: top SUB 0.0625-0, oczekiwano LEDR=0x4000" severity ERROR;
+            report "TEST 2 FAIL: top SUB 0.125-0, oczekiwano LEDR=0x4000" severity ERROR;
         assert ledr /= x"4000"
-            report "TEST 2 PASS: top SUB 0.0625-0 -> LEDR=0x4000 (mantysa=+0.5)" severity NOTE;
-        assert ledg = "111111101"
-            report "TEST 2 FAIL: top SUB, oczekiwano LEDG=-3 (111111101)" severity ERROR;
-        assert ledg /= "111111101"
-            report "TEST 2 PASS: top SUB -> LEDG=-3" severity NOTE;
+            report "TEST 2 PASS: top SUB 0.125-0 -> LEDR=0x4000 (mantysa=+0.5)" severity NOTE;
+        assert ledg = "111111110"
+            report "TEST 2 FAIL: top SUB, oczekiwano LEDG=-2 (111111110)" severity ERROR;
+        assert ledg /= "111111110"
+            report "TEST 2 PASS: top SUB -> LEDG=-2" severity NOTE;
 
         wait for 2 * CLK_PERIOD;
 
-        -- TEST 3: top MUL (SW[1:0]="10") -> 0.0625 * 0 = 0
+        -- TEST 3: top MUL (SW[1:0]="10") -> 0.125 * 0 = 0
         -- COMPUTE: product=0 -> mantysa=0, exp=0+0=0; NORMALIZE pomija zero.
         -- LEDR=0x0000, LEDG=0.
         key <= "1110";
@@ -174,9 +174,9 @@ begin
         for i in 1 to 13 loop wait until rising_edge(clk); end loop;
 
         assert ledr = x"0000"
-            report "TEST 3 FAIL: top MUL 0.0625*0, oczekiwano LEDR=0x0000" severity ERROR;
+            report "TEST 3 FAIL: top MUL 0.125*0, oczekiwano LEDR=0x0000" severity ERROR;
         assert ledr /= x"0000"
-            report "TEST 3 PASS: top MUL 0.0625*0 -> LEDR=0x0000 (mnozenie przez 0)" severity NOTE;
+            report "TEST 3 PASS: top MUL 0.125*0 -> LEDR=0x0000 (mnozenie przez 0)" severity NOTE;
         assert ledg = "000000000"
             report "TEST 3 FAIL: top MUL, oczekiwano LEDG=0" severity ERROR;
         assert ledg /= "000000000"
