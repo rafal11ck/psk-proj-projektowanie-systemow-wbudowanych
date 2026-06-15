@@ -17,6 +17,13 @@ greybox_tmp/
 *.qar
 *.done
 
+# ModelSim runtime files
+transcript
+vsim.wlf
+wlft*
+work/
+rtl_work/
+
 # Editor / OS
 .DS_Store
 *.swp
@@ -24,4 +31,11 @@ greybox_tmp/
 .vscode/
 .idea/
 build
-.direnv
+
+# LaTeX temporary files (the final PDF remains tracked)
+report/*.aux
+report/*.log
+report/*.out
+report/*.toc
+report/*.lof
+report/*.lot

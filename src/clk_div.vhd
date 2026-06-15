@@ -1,39 +1,44 @@
--- Dzielnik zegara: zamienia szybki zegar plytki (50 MHz) na powolny impuls 'tick'.
--- Bez tego liczniki tykalyby 50 milionow razy na sekunde i na diodach nie dalo by sie
--- nic odczytac. 'tick' jest wysoki przez DOKLADNIE jeden cykl zegara co (DIV_MAX+1) cykli.
---
--- DIV_MAX jest generic (parametr): synteza uzywa wartosci domyslnej (~4 Hz),
--- a testbench nadpisuje ja mala liczba, zeby symulacja byla szybka.
-
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
 
 entity clk_div is
     generic (
-        -- tick co (DIV_MAX+1) cykli. 12_500_000 @ 50 MHz => okres 0.25 s => ~4 Hz.
-        DIV_MAX : natural := 12_500_000
+        TICKS_PER_SECOND : positive := 4
     );
     port (
         clk   : in  std_logic;
-        reset : in  std_logic;   -- synchroniczny, active high
-        tick  : out std_logic    -- impuls 1-cyklowy
+        reset : in  std_logic;
+        tick  : out std_logic
     );
 end entity;
 
 architecture rtl of clk_div is
-    -- "natural range 0 to DIV_MAX": syntezator dobierze minimalna liczbe bitow licznika.
-    signal cnt : natural range 0 to DIV_MAX := 0;
+    constant CLOCK_HZ : positive := 50_000_000;
+
+    function calculate_cycles(ticks_hz : positive) return positive is
+    begin
+        if ticks_hz >= CLOCK_HZ then
+            return 1;
+        end if;
+        return CLOCK_HZ / ticks_hz;
+    end function;
+
+    constant CYCLES_PER_TICK : positive := calculate_cycles(TICKS_PER_SECOND);
+    signal cnt : natural range 0 to CYCLES_PER_TICK - 1 := 0;
 begin
 
-    process(clk)
+    assert TICKS_PER_SECOND <= CLOCK_HZ
+        report "clk_div TICKS_PER_SECOND cannot exceed CLOCK_HZ"
+        severity failure;
+
+    process(clk, reset)
     begin
-        if rising_edge(clk) then
-            if reset = '1' then
-                cnt  <= 0;
-                tick <= '0';
-            elsif cnt = DIV_MAX then
-                -- Osiagnieto koniec okresu: wystaw impuls i zacznij liczyc od nowa.
+        if reset = '1' then
+            cnt  <= 0;
+            tick <= '0';
+        elsif rising_edge(clk) then
+            if cnt = CYCLES_PER_TICK - 1 then
                 cnt  <= 0;
                 tick <= '1';
             else

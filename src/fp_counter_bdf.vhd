@@ -1,6 +1,3 @@
--- Wrapper generatora liczb przeznaczony do symbolu Quartus BDF.
--- Rozbija rekord fp_t na dwie zwykle magistrale obslugiwane przez Block Editor.
-
 library ieee;
 use ieee.std_logic_1164.all;
 use work.fp_pkg.all;

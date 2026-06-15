@@ -1,0 +1,716 @@
+\documentclass[12pt,a4paper]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[polish]{babel}
+\usepackage{lmodern}
+\usepackage{geometry}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{pdflscape}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{array}
+\usepackage{xcolor}
+\usepackage{amsmath}
+\usepackage{listings}
+\usepackage{enumitem}
+\usepackage{hyperref}
+\usepackage{caption}
+\usepackage{microtype}
+
+\geometry{margin=2.3cm}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.55em}
+\setlength{\emergencystretch}{2em}
+\setlist{nosep}
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue!45!black,
+    urlcolor=blue!55!black,
+    pdftitle={Jednostka arytmetyczno-logiczna dla liczb w formacie zmiennoprzecinkowym},
+    pdfauthor={[Imie i nazwisko]}
+}
+
+\pagestyle{plain}
+
+\definecolor{codebg}{RGB}{246,247,249}
+\definecolor{codeframe}{RGB}{210,214,220}
+\definecolor{codecomment}{RGB}{50,120,70}
+\definecolor{codekeyword}{RGB}{35,70,150}
+
+\lstset{
+    basicstyle=\ttfamily\small,
+    backgroundcolor=\color{codebg},
+    frame=single,
+    rulecolor=\color{codeframe},
+    keywordstyle=\color{codekeyword}\bfseries,
+    commentstyle=\color{codecomment},
+    showstringspaces=false,
+    columns=fullflexible,
+    keepspaces=true,
+    breaklines=true,
+    tabsize=2
+}
+
+\newcommand{\projekt}{Jednostka arytmetyczno-logiczna dla liczb w formacie zmiennoprzecinkowym}
+\newcommand{\autorzy}{Filip Stępień, Bartłomiej Karkoszka, Rafał Grot}
+\newcommand{\grupa}{1ID21A}
+
+\newcommand{\zrzut}[4][6.5cm]{%
+    \begin{figure}[H]
+        \centering
+        \IfFileExists{#2}{%
+            \includegraphics[width=#3\textwidth,height=0.72\textheight,keepaspectratio]{#2}%
+        }{%
+            \fbox{%
+                \begin{minipage}[c][#1][c]{0.9\textwidth}
+                    \centering
+                    \textbf{\Large MIEJSCE NA ZRZUT EKRANU}\\[0.8em]
+                    \texttt{\detokenize{#2}}\\[0.8em]
+                    #4
+                \end{minipage}%
+            }%
+        }
+        \caption{#4}
+    \end{figure}
+}
+
+\newcommand{\zrzutpoziomy}[4][11cm]{%
+    \begin{figure}[H]
+        \centering
+        \IfFileExists{#2}{%
+            \includegraphics[width=#3\linewidth,height=#1,keepaspectratio]{#2}%
+        }{%
+            \fbox{%
+                \begin{minipage}[c][#1][c]{0.92\linewidth}
+                    \centering
+                    \textbf{\Large MIEJSCE NA ZRZUT EKRANU}\\[0.8em]
+                    \texttt{\detokenize{#2}}\\[0.8em]
+                    #4
+                \end{minipage}%
+            }%
+        }
+        \caption{#4}
+    \end{figure}
+}
+
+\begin{document}
+\pagenumbering{gobble}
+
+\begin{titlepage}
+    \centering
+    \vspace*{1.4cm}
+    {\Large Politechnika Świętokrzyska\par}
+    \vspace{0.35cm}
+    {\large Wydział Elektrotechniki, Automatyki i Informatyki\par}
+    \vspace{0.2cm}
+    {\large Kierunek: Informatyka\par}
+
+    \vfill
+    {\Huge\bfseries \projekt\par}
+    \vspace{0.8cm}
+    {\Large Sprawozdanie z projektu\par}
+    \vfill
+
+    \begin{tabular}{>{\bfseries}rl}
+        Autorzy: & \autorzy \\
+        Grupa: & \grupa \\
+        Przedmiot: & Projektowanie systemów wbudowanych \\
+    \end{tabular}
+
+    \vfill
+    {\large Kielce, \the\year\par}
+\end{titlepage}
+
+\pagenumbering{roman}
+\tableofcontents
+\clearpage
+\pagenumbering{arabic}
+
+\section{Cel i zakres projektu}
+
+Celem projektu było zaprojektowanie oraz przetestowanie w języku VHDL
+jednostki arytmetyczno-logicznej wykonującej trzy operacje na liczbach
+zapisanych w autorskim formacie zmiennoprzecinkowym:
+
+\begin{itemize}
+    \item dodawanie,
+    \item odejmowanie,
+    \item mnożenie.
+\end{itemize}
+
+Układ został zbudowany z niezależnych modułów, połączonych na schemacie
+blokowym \texttt{demo.bdf}. Dwa liczniki generują okresowo zmieniające się
+argumenty wejściowe. Jednostka ALU oblicza wynik wybranej operacji, a sygnał
+\texttt{DONE} informuje o zakończeniu obliczeń. Taka organizacja pozwala
+obserwować działanie projektu zarówno na przebiegach cyfrowych w ModelSimie,
+jak i po przypisaniu wyjść do fizycznych wyprowadzeń układu FPGA.
+
+Projekt obejmuje:
+
+\begin{itemize}
+    \item moduły obliczeniowe napisane w VHDL,
+    \item schemat blokowy najwyższego poziomu wykonany w Quartusie,
+    \item skrypt przygotowujący czytelne przebiegi w ModelSimie,
+    \item automatyczny test porównujący wyniki sprzętowe z wartościami
+          referencyjnymi.
+\end{itemize}
+
+\section{Środowisko i struktura plików}
+
+Projekt przygotowano dla układu \textbf{Intel/Altera Cyclone IV E
+EP4CE115F29C7}. Do syntezy wykorzystano Quartus II, natomiast symulację
+funkcjonalną przeprowadzono w ModelSim-Altera.
+
+Wszystkie źródła opisujące działanie układu znajdują się w katalogu
+\texttt{src/}. Są to moduły VHDL odpowiedzialne za reprezentację liczb,
+generowanie argumentów, sterowanie czasem oraz wykonanie operacji
+arytmetycznych. Dzięki umieszczeniu kodu funkcjonalnego w jednym katalogu
+można łatwo odróżnić go od plików projektu Quartusa, skryptów testowych
+i wyników generowanych podczas kompilacji.
+
+Plik \texttt{demo.bdf} jest graficznym schematem najwyższego poziomu.
+Nie zawiera osobnego algorytmu obliczeniowego, lecz określa, jakie moduły
+VHDL są użyte oraz w jaki sposób połączone są ich porty. Pliki
+\texttt{*.bsf} przechowują symbole bloków widoczne w edytorze schematów
+Quartusa. Definiują wygląd symbolu i rozmieszczenie jego wejść oraz wyjść,
+natomiast właściwe działanie bloków pozostaje zapisane w źródłach VHDL.
+
+\begin{table}[H]
+    \centering
+    \caption{Najważniejsze pliki projektu}
+    \begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash\ttfamily}p{0.38\textwidth}X}
+        \toprule
+        \normalfont Plik & Znaczenie \\
+        \midrule
+        demo.bdf & Graficzny schemat najwyższego poziomu i połączenia modułów. \\
+        *.bsf & Symbole modułów VHDL używane w edytorze schematów Quartusa. \\
+        fp\_alu.qpf, fp\_alu.qsf & Konfiguracja projektu Quartus. \\
+        src/fp\_pkg.vhd & Definicja typu liczby i funkcji pomocniczych. \\
+        src/fp\_counter.vhd & Generator kolejnych wartości argumentów. \\
+        src/clk\_div.vhd & Generator impulsów o zadanej liczbie taktów na sekundę. \\
+        src/start\_delay.vhd & Jednotaktowe opóźnienie rozpoczęcia operacji ALU. \\
+        src/fp\_add\_sub.vhd & Sekwencyjne dodawanie i odejmowanie. \\
+        src/fp\_mul.vhd & Sekwencyjne mnożenie. \\
+        src/fp\_normalize.vhd & Normalizacja wyniku. \\
+        src/alu.vhd & Wybór operacji i wspólny interfejs ALU. \\
+        src/*\_bdf.vhd & Adaptery pomiędzy rekordami VHDL a magistralami BDF. \\
+        test/wave\_scope.do & Konfiguracja i uruchomienie przebiegów. \\
+        test/check\_counter\_\allowbreak{}results.do & Automatyczna kontrola wyników. \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+\section{Format danych}
+
+\subsection{Reprezentacja liczby}
+
+Argumenty oraz wynik są przechowywane jako rekord \texttt{fp\_t} złożony
+z dwóch 16-bitowych liczb ze znakiem:
+
+\begin{lstlisting}[language=VHDL,caption={Format liczby używany w projekcie}]
+type fp_t is record
+    mantissa : signed(15 downto 0);
+    exponent : signed(15 downto 0);
+end record;
+\end{lstlisting}
+
+Mantysa jest liczbą stałoprzecinkową w kodzie uzupełnień do dwóch,
+w formacie Q1.15. Jeden bit reprezentuje znak i część całkowitą, a 15 bitów
+część ułamkową. Wartość liczby oblicza się ze wzoru:
+
+\begin{equation}
+    x = \frac{M}{2^{15}} \cdot 2^E,
+\end{equation}
+
+gdzie \(M\) jest całkowitą wartością 16-bitowej mantysy, a \(E\) jest
+wykładnikiem.
+
+\begin{table}[H]
+    \centering
+    \caption{Przykładowe wartości formatu}
+    \begin{tabular}{rrrr}
+        \toprule
+        Mantysa hex & \(M\) & Wykładnik & Wartość \\
+        \midrule
+        \texttt{1000} & 4096 & 0 & \(0{,}125\) \\
+        \texttt{4000} & 16384 & 0 & \(0{,}5\) \\
+        \texttt{E000} & -8192 & 0 & \(-0{,}25\) \\
+        \texttt{4000} & 16384 & 1 & \(1{,}0\) \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+Format jest prostszy od IEEE 754. Nie zawiera wartości specjalnych
+\textit{NaN} i nieskończoności ani bitu niejawnego. Dzięki temu algorytmy
+arytmetyczne są czytelne, a przebiegi łatwe do zinterpretowania.
+
+\subsection{Normalizacja}
+
+Niezerowy wynik jest normalizowany tak, aby wartość bezwzględna mantysy
+znajdowała się w przedziale:
+
+\begin{equation}
+    0{,}5 \leq |\text{mantysa}| < 1.
+\end{equation}
+
+Jeżeli mantysa jest zbyt mała, moduł \texttt{fp\_normalize} przesuwa ją
+w lewo i jednocześnie zmniejsza wykładnik. Gdy wynik jest równy zero,
+zarówno mantysa, jak i wykładnik są zerowane.
+
+\section{Architektura systemu}
+
+\subsection{Interfejs najwyższego poziomu}
+
+\begin{table}[H]
+    \centering
+    \caption{Porty schematu \texttt{demo.bdf}}
+    \begin{tabularx}{\textwidth}{>{\raggedright\arraybackslash\ttfamily}p{0.31\textwidth}p{0.11\textwidth}X}
+        \toprule
+        \normalfont Port & Kierunek & Znaczenie \\
+        \midrule
+        CLOCK & wejście & Zegar systemowy 50 MHz. \\
+        RESET & wejście & Asynchroniczny reset aktywny stanem wysokim. \\
+        OP[1..0] & wejście & Wybór operacji: 00 -- dodawanie, 01 -- odejmowanie, 10 -- mnożenie. \\
+        A\_MANTISSA[15..0] & wyjście & Mantysa pierwszego argumentu. \\
+        A\_EXPONENT[15..0] & wyjście & Wykładnik pierwszego argumentu. \\
+        B\_MANTISSA[15..0] & wyjście & Mantysa drugiego argumentu. \\
+        B\_EXPONENT[15..0] & wyjście & Wykładnik drugiego argumentu. \\
+        RESULT\_MANTISA[15..0] & wyjście & Mantysa wyniku. Nazwa portu jest zgodna ze schematem. \\
+        RESULT\_EXPONENT[15..0] & wyjście & Wykładnik wyniku. \\
+        DONE & wyjście & Jednotaktowy impuls zakończenia operacji. \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+\clearpage
+\begin{landscape}
+\subsection{Przepływ sygnałów}
+
+Generator \texttt{clk\_div} tworzy impuls \texttt{tick}. Impuls zwiększa
+licznik A. Po wykonaniu pełnego obiegu przez licznik A jego sygnał
+\texttt{carry} zwiększa licznik B. W ten sposób układ automatycznie przechodzi
+przez wszystkie pary argumentów. Ten sam impuls, opóźniony o jeden takt przez
+\texttt{start\_delay}, rozpoczyna obliczenie ALU.
+
+\zrzutpoziomy[11cm]{figures/quartus_blocks.png}{0.98}
+{Schemat \texttt{demo.bdf} w edytorze Block Diagram/Schematic File programu Quartus. Widoczne są moduły projektu, magistrale danych oraz połączenia zegara, resetu, \texttt{tick}, \texttt{carry} i \texttt{start}.}
+\end{landscape}
+\clearpage
+
+\section{Opis modułów}
+
+\subsection{Generator impulsów \texttt{clk\_div}}
+
+Moduł nie tworzy nowej domeny zegarowej. Zlicza zbocza narastające zegara
+\texttt{CLOCK} i generuje jednotaktowy sygnał zezwolenia \texttt{tick}.
+Liczba taktów pomiędzy impulsami wynosi:
+
+\begin{equation}
+    N = \frac{\texttt{CLOCK\_HZ}}{\texttt{TICKS\_PER\_SECOND}}.
+\end{equation}
+
+Na schemacie przyjęto:
+
+\begin{align}
+    \texttt{CLOCK\_HZ} &= 50\,000\,000,\\
+    \texttt{TICKS\_PER\_SECOND} &= 5\,000\,000,\\
+    N &= 10.
+\end{align}
+
+Przy zegarze 50 MHz okres zegara wynosi 20 ns, dlatego nowy impuls
+\texttt{tick} pojawia się co:
+
+\begin{equation}
+    10 \cdot 20\ \text{ns} = 200\ \text{ns}.
+\end{equation}
+
+Parametr można zmniejszyć podczas pracy z fizycznym oscyloskopem, aby zmiany
+były wolniejsze. Zwiększona wartość użyta w projekcie znacznie skraca czas
+symulacji.
+
+\subsection{Generatory argumentów \texttt{fp\_counter}}
+
+Oba liczniki mają parametr \texttt{WIDTH=4}. Wykorzystują 16 stanów i
+generują następujący cykl mantysy:
+
+\begin{equation}
+0,\ \frac18,\ \frac28,\ldots,\frac78,\ -1,\ -\frac78,\ldots,-\frac18.
+\end{equation}
+
+Wykładnik argumentów jest równy zero. Wartości mantysy zmieniają się zatem od
+\(-1\) do \(0{,}875\) ze skokiem \(0{,}125\). Po przejściu z ostatniego stanu
+do zera licznik A wystawia \texttt{carry}. Sygnał ten jest podłączony do
+wejścia \texttt{en} licznika B.
+
+Takie połączenie działa jak dwucyfrowy licznik:
+
+\begin{itemize}
+    \item A jest szybką cyfrą i zmienia się przy każdym impulsie
+          \texttt{tick},
+    \item B jest wolną cyfrą i zmienia się po pełnych 16 krokach A,
+    \item w czasie jednego pełnego przebiegu sprawdzanych jest
+          \(16 \cdot 16 = 256\) par argumentów.
+\end{itemize}
+
+\subsection{Opóźnienie startu \texttt{start\_delay}}
+
+Licznik A aktualizuje argument na zboczu zegara wywołanym przez
+\texttt{tick}. Jednostka ALU nie powinna w tym samym zboczu pobierać starej
+wartości. Dlatego \texttt{start\_delay} opóźnia rozpoczęcie operacji o jeden
+takt zegara:
+
+\begin{center}
+\begin{tabular}{c|cccc}
+    Takt & \(k\) & \(k+1\) & \(k+2\) & \(k+3\) \\
+    \hline
+    \texttt{tick} & 1 & 0 & 0 & 0 \\
+    zmiana A/B & tak & stabilne & stabilne & stabilne \\
+    \texttt{start} & 0 & 1 & 0 & 0 \\
+\end{tabular}
+\end{center}
+
+ALU rozpoczyna zatem pracę dopiero wtedy, gdy oba argumenty są już stabilne.
+
+\subsection{Adaptery \texttt{fp\_counter\_bdf} i \texttt{alu\_bdf}}
+
+Wewnętrzne moduły VHDL używają rekordów typu \texttt{fp\_t}. Edytor
+schematów Quartusa wygodniej obsługuje osobne magistrale
+\texttt{std\_logic\_vector}. Adaptery rozdzielają rekordy na mantysę
+i wykładnik oraz składają je ponownie przed przekazaniem do ALU.
+
+Adaptery nie wykonują obliczeń i nie wprowadzają opóźnienia. Stanowią jedynie
+warstwę dopasowującą interfejs kodu VHDL do symboli użytych w pliku BDF.
+Na ich podstawie Quartus korzysta z symboli
+\texttt{fp\_counter\_bdf.bsf} i \texttt{alu\_bdf.bsf}, które można wstawić
+na schemat oraz połączyć zwykłymi przewodami i magistralami. Pozostałe
+symbole, między innymi \texttt{clk\_div.bsf} i
+\texttt{start\_delay.bsf}, odpowiadają bezpośrednio portom modułów VHDL.
+
+Rozdzielenie to pozwala zachować czytelny kod źródłowy z rekordem
+\texttt{fp\_t}, a jednocześnie przedstawiać najważniejsze połączenia całego
+systemu w graficznej postaci na schemacie \texttt{demo.bdf}.
+
+\subsection{Jednostka nadrzędna \texttt{alu}}
+
+Moduł \texttt{alu} uruchamia równolegle:
+
+\begin{itemize}
+    \item blok dodawania/odejmowania \texttt{fp\_add\_sub},
+    \item blok mnożenia \texttt{fp\_mul}.
+\end{itemize}
+
+Sygnał \texttt{OP} wybiera wynik i sygnał \texttt{done} właściwego bloku.
+Kodowanie operacji przedstawia tabela~\ref{tab:op}.
+
+\begin{table}[H]
+    \centering
+    \caption{Kodowanie wejścia \texttt{OP}}
+    \label{tab:op}
+    \begin{tabular}{cl}
+        \toprule
+        \texttt{OP} & Operacja \\
+        \midrule
+        \texttt{00} & \(A+B\) \\
+        \texttt{01} & \(A-B\) \\
+        \texttt{10} & \(A\cdot B\) \\
+        \texttt{11} & kod niewykorzystywany \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\subsection{Dodawanie i odejmowanie}
+
+Blok \texttt{fp\_add\_sub} jest maszyną stanów. Operacja przebiega
+w czterech etapach:
+
+\begin{table}[H]
+    \centering
+    \caption{Stany bloku dodawania i odejmowania}
+    \begin{tabularx}{\textwidth}{>{\ttfamily}p{0.2\textwidth}X}
+        \toprule
+        \normalfont Stan & Działanie \\
+        \midrule
+        S\_IDLE & Oczekiwanie na \texttt{start} i zapamiętanie argumentów. \\
+        S\_ALIGN & Wyrównanie wykładników przez przesunięcie mantysy liczby o mniejszym wykładniku. \\
+        S\_COMPUTE & Dodanie lub odjęcie rozszerzonych mantys oraz obsługa przepełnienia. \\
+        S\_NORMALIZE & Normalizacja, zapis wyniku i wygenerowanie \texttt{done}. \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+Przed wykonaniem działania wykładniki muszą być równe. Mantysa liczby
+o mniejszym wykładniku jest przesuwana arytmetycznie w prawo, a jej wykładnik
+zwiększany. Po wyrównaniu wykonywane jest dodawanie lub odejmowanie na
+17 bitach. Dodatkowy bit umożliwia wykrycie wyniku wykraczającego poza zakres
+Q1.15. W takim przypadku mantysa jest przesuwana w prawo, a wykładnik
+zwiększany o jeden.
+
+\subsection{Mnożenie}
+
+Blok \texttt{fp\_mul} działa w trzech stanach:
+
+\begin{enumerate}
+    \item zapamiętuje argumenty,
+    \item mnoży dwie 16-bitowe mantysy i dodaje wykładniki,
+    \item normalizuje wynik i zgłasza zakończenie.
+\end{enumerate}
+
+Iloczyn dwóch liczb Q1.15 ma 32 bity i skalę Q2.30. Aby wrócić do formatu
+Q1.15, wybierane są bity \texttt{30 downto 15}. Wartość przed normalizacją
+można zapisać jako:
+
+\begin{equation}
+    M_R = \frac{M_A \cdot M_B}{2^{15}},
+    \qquad E_R = E_A + E_B.
+\end{equation}
+
+Po tej operacji wynik jest przekazywany do wspólnego modułu normalizującego.
+
+\section{Przebieg działania}
+
+Po zwolnieniu resetu system pracuje autonomicznie:
+
+\begin{enumerate}
+    \item \texttt{clk\_div} odmierza dziesięć taktów zegara,
+    \item impuls \texttt{tick} zwiększa argument A,
+    \item po pełnym obiegu A zwiększany jest argument B,
+    \item takt później \texttt{start\_delay} generuje \texttt{start},
+    \item ALU zapamiętuje A, B oraz wykonuje operację wybraną przez
+          \texttt{OP},
+    \item po zakończeniu wystawia wynik oraz jednotaktowy impuls
+          \texttt{DONE}.
+\end{enumerate}
+
+Okres 200 ns pomiędzy kolejnymi impulsami \texttt{tick} jest większy od
+latencji każdego bloku arytmetycznego, dlatego bieżąca operacja kończy się
+przed rozpoczęciem następnej.
+
+\section{Kompilacja w Quartusie}
+
+\subsection{Procedura}
+
+\begin{enumerate}
+    \item Otworzyć plik projektu \texttt{fp\_alu.qpf}.
+    \item Sprawdzić, czy jednostką najwyższego poziomu jest \texttt{demo}.
+    \item Wybrać \texttt{Processing -> Start Compilation}.
+    \item Po zakończeniu sprawdzić liczbę błędów w oknie komunikatów.
+    \item Do symulacji funkcjonalnej wygenerować plik
+          \texttt{simulation/qsim/fp\_alu.vo}.
+\end{enumerate}
+
+Pełna kompilacja sprawdzonej wersji projektu kończy się bez błędów.
+
+\zrzut{figures/quartus_compilation.png}{0.92}
+{Wynik kompilacji projektu w Quartusie. Kompilacja jednostki najwyższego poziomu \texttt{demo} zakończyła się bez błędów.}
+
+\section{Symulacja przebiegów w ModelSimie}
+
+\subsection{Uruchomienie}
+
+Skrypt należy uruchomić z katalogu \texttt{simulation/qsim}:
+
+\begin{lstlisting}[language=tcl,caption={Uruchomienie symulacji przebiegów}]
+do ../../test/wave_scope.do
+\end{lstlisting}
+
+Skrypt automatycznie:
+
+\begin{itemize}
+    \item kompiluje netlistę \texttt{fp\_alu.vo},
+    \item ładuje projekt \texttt{work.demo},
+    \item generuje zegar 50 MHz,
+    \item wymusza reset i kolejne wartości \texttt{OP},
+    \item dodaje najważniejsze sygnały do okna Wave,
+    \item ustawia mantysy jako analogowe przebiegi schodkowe,
+    \item uruchamia symulację na 50 \(\mu\)s.
+\end{itemize}
+
+\begin{table}[H]
+    \centering
+    \caption{Wymuszenia użyte przez \texttt{wave\_scope.do}}
+    \begin{tabular}{lll}
+        \toprule
+        Czas & Sygnał & Wartość \\
+        \midrule
+        0--200 ns & \texttt{RESET} & 1 \\
+        od 200 ns & \texttt{RESET} & 0 \\
+        0--15 \(\mu\)s & \texttt{OP} & 00 -- dodawanie \\
+        15--30 \(\mu\)s & \texttt{OP} & 01 -- odejmowanie \\
+        30--50 \(\mu\)s & \texttt{OP} & 10 -- mnożenie \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\clearpage
+\begin{landscape}
+\subsection{Interpretacja przebiegów}
+
+Na wykresie A tworzy szybką piłę schodkową, ponieważ jego licznik jest
+zwiększany przy każdym impulsie \texttt{tick}. B zmienia się 16 razy wolniej,
+gdyż jest zwiększane dopiero po pełnym cyklu A. Wynik zależy od operacji
+wskazanej przez \texttt{OP}:
+
+\begin{itemize}
+    \item dla \texttt{OP=00} wynik jest sumą A i B; ponieważ B pozostaje
+          chwilowo stałe, przebieg przypomina A przesunięte o wartość B,
+    \item dla \texttt{OP=01} wynik jest różnicą A i B; odejmowanie stałego
+          fragmentu B przesuwa przebieg A w dół,
+    \item dla \texttt{OP=10} B skaluje przebieg A; dodatnie B zachowuje jego
+          kierunek, ujemne odwraca znak, a wartość bezwzględna B określa
+          amplitudę.
+\end{itemize}
+
+Mantysę i wykładnik należy analizować łącznie. Sama mantysa może zmaleć po
+normalizacji, mimo że rzeczywista wartość wyniku wzrosła. Przykładowo liczba
+1 jest reprezentowana jako mantysa \(0{,}5\) i wykładnik 1. Z tego powodu
+widoczny kształt mantysy wyniku może zawierać dodatkowe uskoki w chwilach
+zmiany wykładnika, mimo że rzeczywista wartość operacji zmienia się zgodnie
+z opisanymi zależnościami. Schodkowy wygląd wynika natomiast z tego, że
+ModelSim rysuje kolejne cyfrowe wartości magistrali jako przebieg
+\textit{Analog (Step)}.
+
+\zrzutpoziomy[8.2cm]{figures/modelsim_waveforms.png}{0.98}
+{Okno Wave po wykonaniu \texttt{wave\_scope.do}. Mantysy A, B i wyniku przedstawiono jako przebiegi \textit{Analog (Step)}; widoczne są również wykładniki, \texttt{DONE}, \texttt{OP}, \texttt{RESET} i \texttt{CLOCK}.}
+\end{landscape}
+\clearpage
+
+\section{Automatyczna weryfikacja obliczeń}
+
+\subsection{Sposób działania testu}
+
+Samo obejrzenie przebiegów pozwala ocenić ogólny kształt sygnałów, ale nie
+gwarantuje poprawności każdej wartości. Dlatego przygotowano skrypt
+\texttt{check\_counter\_results.do}.
+
+Uruchomienie:
+
+\begin{lstlisting}[language=tcl,caption={Uruchomienie automatycznego testu}]
+do ../../test/check_counter_results.do
+\end{lstlisting}
+
+Po każdym impulsie \texttt{DONE} skrypt:
+
+\begin{enumerate}
+    \item odczytuje mantysy i wykładniki A, B oraz wyniku,
+    \item zamienia zapis sprzętowy na wartości rzeczywiste,
+    \item oblicza oczekiwany wynik dla aktualnego \texttt{OP},
+    \item porównuje wynik sprzętowy z referencyjnym,
+    \item zapisuje wiersz \texttt{PASS} albo \texttt{FAIL}.
+\end{enumerate}
+
+Wartość odczytana z portów jest rekonstruowana zgodnie ze wzorem:
+
+\begin{equation}
+    x_{\text{ModelSim}} =
+    \frac{\operatorname{signed}(\text{mantissa})}{32768}
+    \cdot 2^{\operatorname{signed}(\text{exponent})}.
+\end{equation}
+
+Porównanie wykorzystuje tolerancję \(10^{-9}\). Dla wartości występujących
+w tym teście nie jest potrzebne dodatkowe zaokrąglanie, ponieważ są one
+wielokrotnościami potęg liczby 2 i mają dokładną reprezentację binarną.
+
+\subsection{Przykładowe przypadki}
+
+\begin{table}[H]
+    \centering
+    \caption{Przykładowe wyniki sprawdzane przez skrypt}
+    \begin{tabular}{lrrrr}
+        \toprule
+        Operacja & A & B & Oczekiwano & Otrzymano \\
+        \midrule
+        ADD & \(0{,}875\) & \(0{,}125\) & \(1{,}000\) & \(1{,}000\) \\
+        SUB & \(-0{,}750\) & \(0{,}500\) & \(-1{,}250\) & \(-1{,}250\) \\
+        MUL & \(0{,}625\) & \(-0{,}875\) & \(-0{,}546875\) & \(-0{,}546875\) \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+Pełny dziennik jest zapisywany do pliku:
+
+\begin{center}
+    \texttt{build/counter\_results.log}
+\end{center}
+
+W zweryfikowanej wersji projektu otrzymano:
+
+\begin{lstlisting}[caption={Podsumowanie automatycznego testu}]
+SUMMARY: checked=248 passed=248 failed=0
+COUNTER/ALU CHECK PASSED
+\end{lstlisting}
+
+Liczba 248 odpowiada operacjom zakończonym w czasie 50 \(\mu\)s przy
+zastosowanych wymuszeniach. Nie jest to ograniczenie liczby kombinacji
+wejściowych, lecz rezultat wybranego czasu symulacji.
+
+\zrzut{figures/modelsim_checker.png}{0.94}
+{Okno Transcript po wykonaniu \texttt{check\_counter\_results.do}. Końcowe podsumowanie zawiera \texttt{checked=248 passed=248 failed=0} oraz komunikat \texttt{COUNTER/ALU CHECK PASSED}.}
+
+\section{Uzyskane rezultaty}
+
+Przeprowadzona kompilacja i symulacja potwierdziły:
+
+\begin{itemize}
+    \item poprawne generowanie argumentów A i B,
+    \item właściwe opóźnienie sygnału startu względem zmiany argumentów,
+    \item poprawne działanie dodawania, odejmowania i mnożenia,
+    \item prawidłową normalizację mantysy i aktualizację wykładnika,
+    \item generowanie impulsu \texttt{DONE} po zakończeniu obliczenia,
+    \item zgodność 248 kolejnych wyników z modelem referencyjnym.
+\end{itemize}
+
+Przebiegi analogowe w ModelSimie ułatwiają ocenę działania systemu:
+argument A jest szybką piłą, B wolną piłą, a wynik tworzy kształt zależny
+od operacji. Automatyczny test uzupełnia tę ocenę o dokładne sprawdzenie
+wartości liczbowych.
+
+\section{Ograniczenia i możliwy rozwój}
+
+Aktualna wersja jest demonstratorem jednostki ALU, dlatego ma kilka świadomie
+przyjętych ograniczeń:
+
+\begin{itemize}
+    \item format nie jest zgodny z IEEE 754,
+    \item nie występują wartości specjalne ani obsługa wyjątków,
+    \item wykładniki argumentów z liczników są stale równe zero,
+    \item nie zastosowano bitów ochronnych i rozbudowanego zaokrąglania,
+    \item kod \texttt{OP=11} nie realizuje operacji,
+    \item przed implementacją na płytce należy przypisać piny i dodać
+          ograniczenia czasowe.
+\end{itemize}
+
+Projekt można rozwinąć przez dodanie dzielenia, testów dla różnych
+wykładników, obsługi przepełnienia wykładnika, trybów zaokrąglania oraz
+interfejsu umożliwiającego podawanie argumentów z zewnątrz.
+
+\section{Skrócona instrukcja odtworzenia wyników}
+
+\begin{enumerate}
+    \item Otworzyć \texttt{fp\_alu.qpf} w Quartusie.
+    \item Uruchomić pełną kompilację projektu.
+    \item Upewnić się, że w \texttt{simulation/qsim} znajduje się
+          \texttt{fp\_alu.vo}.
+    \item Uruchomić ModelSim-Altera w katalogu \texttt{simulation/qsim}.
+    \item Wpisać \texttt{do ../../test/wave\_scope.do}, aby obejrzeć
+          przebiegi.
+    \item Wpisać \texttt{do ../../test/check\_counter\_results.do}, aby
+          wykonać kontrolę liczbową.
+    \item Sprawdzić podsumowanie w oknie Transcript oraz dziennik
+          \path{build/counter_results.log}.
+\end{enumerate}
+
+\section{Podsumowanie}
+
+W ramach projektu wykonano modułową jednostkę ALU operującą na liczbach
+z 16-bitową mantysą Q1.15 i 16-bitowym wykładnikiem. Układ realizuje
+dodawanie, odejmowanie oraz mnożenie, a generatory argumentów pozwalają na
+ciągłą obserwację jego działania bez zewnętrznego źródła danych.
+
+Połączenie schematu blokowego Quartusa, czytelnych przebiegów ModelSim oraz
+automatycznej kontroli wartości zapewnia trzy poziomy weryfikacji:
+strukturalny, wizualny i liczbowy. Wszystkie sprawdzone przypadki zakończyły
+się wynikiem poprawnym.
+
+\end{document}

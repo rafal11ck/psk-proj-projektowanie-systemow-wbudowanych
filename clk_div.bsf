@@ -45,8 +45,8 @@ applicable agreement for further details.
 		(line (pt 136 32)(pt 120 32)(line_width 1))
 	)
 	(parameter
-		"DIV_MAX"
-		"12500000"
+		"TICKS_PER_SECOND"
+		"4"
 		""
 		(type "PARAMETER_SIGNED_DEC")	)
 	(drawing

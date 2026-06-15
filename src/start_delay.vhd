@@ -1,7 +1,3 @@
--- Opoznia impuls tick o jeden cykl zegara.
--- Liczniki aktualizuja A/B na ticku, a ALU dostaje start w kolejnym cyklu,
--- dlatego wynik odpowiada wartosciom aktualnie widocznym na wyjsciach licznikow.
-
 library ieee;
 use ieee.std_logic_1164.all;
 
@@ -16,14 +12,12 @@ end entity;
 
 architecture rtl of start_delay is
 begin
-    process(clk)
+    process(clk, reset)
     begin
-        if rising_edge(clk) then
-            if reset = '1' then
-                start <= '0';
-            else
-                start <= tick;
-            end if;
+        if reset = '1' then
+            start <= '0';
+        elsif rising_edge(clk) then
+            start <= tick;
         end if;
     end process;
 end architecture;

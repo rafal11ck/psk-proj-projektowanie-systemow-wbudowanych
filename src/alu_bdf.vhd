@@ -1,7 +1,3 @@
--- Wrapper ALU przeznaczony do uzycia w schemacie Quartus BDF.
--- Quartus II nie potrafi utworzyc symbolu dla portow typu record (fp_t),
--- dlatego pola rekordu sa tutaj wystawione jako zwykle magistrale 16-bitowe.
-
 library ieee;
 use ieee.std_logic_1164.all;
 use ieee.numeric_std.all;
